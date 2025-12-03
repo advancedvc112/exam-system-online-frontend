@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  App,
   Button,
   Card,
   DatePicker,
@@ -10,8 +11,7 @@ import {
   Select,
   Space,
   Table,
-  Tag,
-  message
+  Tag
 } from "antd";
 import dayjs from "dayjs";
 import {
@@ -19,9 +19,12 @@ import {
   ExamDTO,
   ExamPageDTO,
   fetchExams,
-  updateExamStatus
+  updateExamStatus,
+  deleteExam
 } from "../../api/exam";
 import { fetchPapers, PaperDTO } from "../../api/paper";
+import { startExam } from "../../api/execution";
+import { useAuth } from "../../state/AuthContext";
 
 const statusMap: Record<string, { text: string; color: string }> = {
   not_started: { text: "未开始", color: "blue" },
@@ -31,6 +34,8 @@ const statusMap: Record<string, { text: string; color: string }> = {
 };
 
 export default function ExamSchedulePage() {
+  const { message } = App.useApp();
+  const { role } = useAuth();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ExamPageDTO>();
   const [modalOpen, setModalOpen] = useState(false);
@@ -57,33 +62,111 @@ export default function ExamSchedulePage() {
     loadPapers();
   }, []);
 
-  const columns = [
-    { title: "考试名称", dataIndex: "name" },
-    {
-      title: "状态",
-      dataIndex: "status",
-      render: (value: string) => (
-        <Tag color={statusMap[value]?.color}>{statusMap[value]?.text}</Tag>
-      )
-    },
-    { title: "试卷ID", dataIndex: "paperId" },
-    { title: "考试时长", dataIndex: "duration" },
-    {
-      title: "考试时间",
-      render: (record: ExamDTO) =>
-        `${record.startTime} ~ ${record.endTime}`
-    },
-    {
-      title: "操作",
-      render: (record: ExamDTO) => (
-        <Space>
-          <Button size="small" onClick={() => updateExamStatus(record.id!)}>
-            同步状态
-          </Button>
-        </Space>
-      )
+  const handleSyncStatus = async (record: ExamDTO) => {
+    if (!record.id) return;
+    await updateExamStatus(record.id);
+    message.success("考试状态已同步（开启/结束考试）");
+    loadData();
+  };
+
+  const handleDelete = async (record: ExamDTO) => {
+    if (!record.id) return;
+    await deleteExam(record.id);
+    message.success("考试已取消");
+    loadData();
+  };
+
+  const handleEnterExam = async (record: ExamDTO) => {
+    if (!record.id) return;
+    try {
+      const res = await startExam(record.id);
+      // 后端有可能返回裸的数字，也有可能包了一层对象，这里统一做兼容处理
+      const examRecordId =
+        typeof res === "number"
+          ? res
+          : (res as any).examRecordId ?? (res as any).id ?? (res as any).data;
+      message.success("进入考试成功");
+      // 跳转到考试执行页面，携带考试记录ID
+      if (examRecordId == null || Number.isNaN(Number(examRecordId))) {
+        message.error("进入考试失败：考试记录ID异常");
+        return;
+      }
+      window.location.href = `/execution?examRecordId=${Number(examRecordId)}`;
+    } catch (e: any) {
+      const raw = e?.response?.data?.message ?? e?.message;
+      message.error(
+        typeof raw === "string" ? raw : "进入考试失败"
+      );
     }
-  ];
+  };
+
+  const columns = useMemo(
+    () => {
+      const base = [
+        { title: "考试名称", dataIndex: "name" },
+        {
+          title: "状态",
+          dataIndex: "status",
+          render: (value: string) => (
+            <Tag color={statusMap[value]?.color}>{statusMap[value]?.text}</Tag>
+          )
+        },
+        { title: "试卷ID", dataIndex: "paperId" },
+        { title: "考试时长", dataIndex: "duration" },
+        {
+          title: "考试时间",
+          render: (record: ExamDTO) =>
+            `${record.startTime} ~ ${record.endTime}`
+        }
+      ];
+
+      if (role === "student") {
+        return [
+          ...base,
+          {
+            title: "操作",
+            render: (record: ExamDTO) => (
+              <Space>
+                <Button
+                  type="primary"
+                  size="small"
+                  disabled={record.status !== "in_progress"}
+                  onClick={() => handleEnterExam(record)}
+                >
+                  进入考试
+                </Button>
+              </Space>
+            )
+          }
+        ];
+      }
+
+      // 管理员/教师视图：原来的“开启/结束/取消”操作
+      return [
+        ...base,
+        {
+          title: "操作",
+          render: (record: ExamDTO) => (
+            <Space>
+              <Button size="small" onClick={() => handleSyncStatus(record)}>
+                {record.status === "not_started"
+                  ? "开启考试"
+                  : record.status === "in_progress"
+                  ? "结束考试"
+                  : "同步状态"}
+              </Button>
+              {record.status === "not_started" && (
+                <Button danger size="small" onClick={() => handleDelete(record)}>
+                  取消考试
+                </Button>
+              )}
+            </Space>
+          )
+        }
+      ];
+    },
+    [role]
+  );
 
   const handleSubmit = async () => {
     const values = await form.validateFields();
@@ -102,9 +185,11 @@ export default function ExamSchedulePage() {
     <Card
       title="考试安排"
       extra={
-        <Button type="primary" onClick={() => setModalOpen(true)}>
-          创建考试
-        </Button>
+        role !== "student" && (
+          <Button type="primary" onClick={() => setModalOpen(true)}>
+            创建考试
+          </Button>
+        )
       }
     >
       <Table

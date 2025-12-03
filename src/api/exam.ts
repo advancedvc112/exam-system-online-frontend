@@ -41,7 +41,16 @@ export const fetchExams = async (
   return data.data ?? data;
 };
 
+/**
+ * 手动同步某场考试的状态（视为“开启/结束考试”等操作）
+ */
 export const updateExamStatus = async (id: number) => {
   await http.put(`/exam-online/manage/exam/${id}/status`);
 };
 
+/**
+ * 取消考试（删除安排）
+ */
+export const deleteExam = async (id: number) => {
+  await http.delete(`/exam-online/manage/exam/${id}`);
+};

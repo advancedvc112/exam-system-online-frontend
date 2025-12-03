@@ -1,4 +1,5 @@
 import {
+  App,
   Button,
   Card,
   Col,
@@ -13,8 +14,7 @@ import {
   Space,
   Table,
   Tabs,
-  Tag,
-  message
+  Tag
 } from "antd";
 import { useEffect, useState } from "react";
 import {
@@ -41,6 +41,7 @@ const difficultyOptions = [
 ];
 
 export default function PaperPage() {
+  const { message } = App.useApp();
   const [data, setData] = useState<PaperDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [randomModalOpen, setRandomModalOpen] = useState(false);

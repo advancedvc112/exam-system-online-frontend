@@ -4,6 +4,9 @@
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "";
 
+// WebSocket 基础地址：默认使用相对路径，由 Vite 代理到后端（避免出现 /ws/ws/exam 这种重复前缀）
+// - 默认值留空：前端会直接连到 /ws/exam
+// - 如需跨域直连后端，可在 .env 中设置 VITE_WS_BASE_URL=http://localhost:8080
 export const WS_BASE_URL =
-  import.meta.env.VITE_WS_BASE_URL ?? "/ws";
+  import.meta.env.VITE_WS_BASE_URL ?? "";
 

@@ -1,12 +1,13 @@
-import { Button, Card, Form, Input, Typography } from "antd";
+import { Button, Card, Form, Input, Select, Typography } from "antd";
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../state/AuthContext";
-import { LoginPayload } from "../../api/auth";
+import { LoginPayload, UserRole } from "../../api/auth";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [isRegister, setIsRegister] = useState(false);
+  const { login, register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: Location })?.from?.pathname ?? "/";
@@ -14,7 +15,11 @@ export default function LoginPage() {
   const handleSubmit = async (values: LoginPayload) => {
     setLoading(true);
     try {
-      await login(values);
+      if (isRegister) {
+        await register(values);
+      } else {
+        await login(values);
+      }
       navigate(from, { replace: true });
     } finally {
       setLoading(false);
@@ -33,9 +38,13 @@ export default function LoginPage() {
     >
       <Card style={{ width: 380 }}>
         <Typography.Title level={4} style={{ textAlign: "center" }}>
-          在线考试系统登录
+          在线考试系统{isRegister ? "注册" : "登录"}
         </Typography.Title>
-        <Form layout="vertical" onFinish={handleSubmit}>
+        <Form<LoginPayload>
+          layout="vertical"
+          onFinish={handleSubmit}
+          initialValues={{ role: "student" as UserRole }}
+        >
           <Form.Item
             label="用户名"
             name="username"
@@ -50,6 +59,20 @@ export default function LoginPage() {
           >
             <Input.Password size="large" placeholder="密码" />
           </Form.Item>
+          <Form.Item
+            label="身份"
+            name="role"
+            rules={[{ required: true, message: "请选择身份" }]}
+          >
+            <Select<UserRole>
+              size="large"
+              options={[
+                { label: "管理员", value: "admin" },
+                { label: "教师", value: "teacher" },
+                { label: "学生", value: "student" }
+              ]}
+            />
+          </Form.Item>
           <Button
             type="primary"
             block
@@ -57,8 +80,16 @@ export default function LoginPage() {
             htmlType="submit"
             loading={loading}
           >
-            登录
+            {isRegister ? "注册并登录" : "登录"}
           </Button>
+          <div style={{ marginTop: 16, textAlign: "center" }}>
+            <Button
+              type="link"
+              onClick={() => setIsRegister(!isRegister)}
+            >
+              {isRegister ? "已有账号？去登录" : "没有账号？去注册"}
+            </Button>
+          </div>
         </Form>
       </Card>
     </div>

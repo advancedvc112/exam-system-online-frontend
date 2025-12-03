@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  App,
   Button,
   Card,
   Form,
@@ -8,8 +9,7 @@ import {
   Select,
   Space,
   Table,
-  Tag,
-  message
+  Tag
 } from "antd";
 import {
   createQuestion,
@@ -34,6 +34,7 @@ const difficultyOptions = [
 ];
 
 export default function QuestionPage() {
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<QuestionDTO[]>([]);
   const [pagination, setPagination] = useState({
