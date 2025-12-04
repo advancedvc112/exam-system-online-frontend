@@ -23,7 +23,7 @@ import {
   deleteExam
 } from "../../api/exam";
 import { fetchPapers, PaperDTO } from "../../api/paper";
-import { startExam } from "../../api/execution";
+import { startExam, getExamToken } from "../../api/execution";
 import { useAuth } from "../../state/AuthContext";
 
 const statusMap: Record<string, { text: string; color: string }> = {
@@ -79,12 +79,26 @@ export default function ExamSchedulePage() {
   const handleEnterExam = async (record: ExamDTO) => {
     if (!record.id) return;
     try {
-      const res = await startExam(record.id);
+      // 第一步：获取考试令牌
+      const examToken = await getExamToken(record.id);
+      if (!examToken) {
+        message.error("获取考试令牌失败");
+        return;
+      }
+
+      // 第二步：使用令牌进入考试
+      const res = await startExam(record.id, examToken);
       // 后端有可能返回裸的数字，也有可能包了一层对象，这里统一做兼容处理
       const examRecordId =
         typeof res === "number"
           ? res
           : (res as any).examRecordId ?? (res as any).id ?? (res as any).data;
+      
+      // 将令牌存储到 localStorage，供考试执行页面使用
+      if (examRecordId) {
+        localStorage.setItem(`exam-token-${examRecordId}`, examToken);
+      }
+      
       message.success("进入考试成功");
       // 跳转到考试执行页面，携带考试记录ID
       if (examRecordId == null || Number.isNaN(Number(examRecordId))) {

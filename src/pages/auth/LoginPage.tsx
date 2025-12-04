@@ -50,14 +50,14 @@ export default function LoginPage() {
             name="username"
             rules={[{ required: true, message: "请输入用户名" }]}
           >
-            <Input size="large" placeholder="用户名" />
+            <Input size="large" placeholder="用户名" autoComplete="username" />
           </Form.Item>
           <Form.Item
             label="密码"
             name="password"
             rules={[{ required: true, message: "请输入密码" }]}
           >
-            <Input.Password size="large" placeholder="密码" />
+            <Input.Password size="large" placeholder="密码" autoComplete="current-password" />
           </Form.Item>
           <Form.Item
             label="身份"

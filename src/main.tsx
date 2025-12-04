@@ -8,12 +8,12 @@ import "./styles/global.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <AntdApp>
+    <BrowserRouter future={{ v7_relativeSplatPath: true }}>
+      <AntdApp>
+        <AuthProvider>
           <App />
-        </AntdApp>
-      </AuthProvider>
+        </AuthProvider>
+      </AntdApp>
     </BrowserRouter>
   </React.StrictMode>
 );

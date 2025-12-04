@@ -5,7 +5,8 @@ import Stomp from "stompjs";
 import {
   saveAnswer,
   fetchProgress,
-  fetchExamRecordInfo
+  fetchExamRecordInfo,
+  submitExam
 } from "../../api/execution";
 import { WS_BASE_URL } from "../../config";
 import { useLocation } from "react-router-dom";
@@ -26,13 +27,22 @@ export default function ExecutionPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [progress, setProgress] = useState(0);
+  const [examToken, setExamToken] = useState<string | null>(null);
   const stompClient = useRef<Stomp.Client | null>(null);
 
-  // 加载试卷题目
+  // 加载试卷题目和令牌
   useEffect(() => {
     const loadPaper = async () => {
       if (!examRecordId) return;
       try {
+        // 从 localStorage 读取令牌
+        const token = localStorage.getItem(`exam-token-${examRecordId}`);
+        if (token) {
+          setExamToken(token);
+        } else {
+          message.warning("未找到考试令牌，部分功能可能无法使用");
+        }
+
         const info = await fetchExamRecordInfo(examRecordId);
         const p = await getPaperById(info.paperId);
         setPaper(p);
@@ -108,13 +118,43 @@ export default function ExecutionPage() {
   })();
 
   const handleSaveAnswer = async (questionId: number, value: string) => {
-    if (!examRecordId || !questionId || !value) {
+    if (!examRecordId || !questionId || !value || !examToken) {
+      if (!examToken) {
+        message.warning("缺少考试令牌，无法保存答案");
+      }
       return;
     }
-    await saveAnswer({ examRecordId, questionId, studentAnswer: value });
-    setAnswers((prev) => ({ ...prev, [questionId]: value }));
-    const currentProgress = await fetchProgress(examRecordId);
-    setProgress(currentProgress);
+    try {
+      await saveAnswer({ examRecordId, questionId, studentAnswer: value }, examToken);
+      setAnswers((prev) => ({ ...prev, [questionId]: value }));
+      const currentProgress = await fetchProgress(examRecordId);
+      setProgress(currentProgress);
+    } catch (e: any) {
+      const raw = e?.response?.data?.message ?? e?.message;
+      message.error(
+        typeof raw === "string" ? raw : "保存答案失败"
+      );
+    }
+  };
+
+  const handleSubmitExam = async () => {
+    if (!examRecordId || !examToken) {
+      message.error("缺少必要信息，无法提交考试");
+      return;
+    }
+    try {
+      await submitExam(examRecordId, examToken);
+      message.success("考试提交成功");
+      // 清除令牌
+      localStorage.removeItem(`exam-token-${examRecordId}`);
+      // 可以跳转到结果页面或返回考试列表
+      window.location.href = "/exam";
+    } catch (e: any) {
+      const raw = e?.response?.data?.message ?? e?.message;
+      message.error(
+        typeof raw === "string" ? raw : "提交考试失败"
+      );
+    }
   };
 
   const handleSwitch = () => {
@@ -143,8 +183,13 @@ export default function ExecutionPage() {
               当前进度：第 {currentIndex + 1} / {paper.questions?.length ?? 0} 题
             </Tag>
             <Tag color="green">实时已答：{progress} 题</Tag>
-            <Button onClick={sendHeartbeat}>发送心跳</Button>
-            <Button danger onClick={handleSwitch}>模拟切屏</Button>
+            <Space>
+              <Button onClick={sendHeartbeat}>发送心跳</Button>
+              <Button danger onClick={handleSwitch}>模拟切屏</Button>
+              <Button type="primary" danger onClick={handleSubmitExam}>
+                提交考试
+              </Button>
+            </Space>
           </Space>
 
           <div>
@@ -188,6 +233,13 @@ export default function ExecutionPage() {
                     ...prev,
                     [currentQuestion.questionId]: val
                   }));
+                }}
+                onBlur={async (e) => {
+                  // 失焦时自动保存答案
+                  const val = e.target.value;
+                  if (val && val.trim()) {
+                    await handleSaveAnswer(currentQuestion.questionId, val);
+                  }
                 }}
               />
             )}
